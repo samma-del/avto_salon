@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="kk">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Автосалон | Көліктер каталогы</title>
+  <style>
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: #101318;
+      color: #f5f6f8;
+      font: 16px/1.5 system-ui, sans-serif;
+      color-scheme: dark;
+    }
+
+    main {
+      width: min(1050px, calc(100% - 32px));
+      margin: 48px auto;
+    }
+
+    header p { margin: 0; color: #ffc878; font-weight: 700; }
+    h1 { margin: 4px 0 24px; font-size: clamp(32px, 6vw, 56px); }
+
+    .filters, .catalog {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(230px, 100%), 1fr));
+      gap: 16px;
+    }
+
+    label { display: grid; gap: 6px; }
+
+    select, input {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid #525b69;
+      border-radius: 8px;
+      background: #1c222b;
+      color: inherit;
+      font: inherit;
+    }
+
+    article {
+      padding: 24px;
+      border: 1px solid #353e4b;
+      border-radius: 12px;
+      background: #1c222b;
+    }
+
+    article h2 { margin: 0; font-size: 22px; }
+    article p, #result { color: #c5ccd6; }
+    article strong { color: #ffc878; }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <p>Автосалон</p>
+      <h1>Көліктер каталогы</h1>
+    </header>
+
+    <section class="filters" aria-label="Каталог сүзгілері">
+      <label>
+        Марка
+        <select id="brand">
+          <option value="">Барлық марка</option>
+        </select>
+      </label>
+
+      <label>
+        Ең жоғары баға (₸)
+        <input id="max-price" type="number" min="0" placeholder="Мысалы, 15000000">
+      </label>
+    </section>
+
+    <p id="result" role="status"></p>
+    <section id="catalog" class="catalog" aria-label="Көліктер"></section>
+  </main>
+
+  <script>
+    const brand = document.querySelector('#brand');
+    const maxPrice = document.querySelector('#max-price');
+    const result = document.querySelector('#result');
+    const catalog = document.querySelector('#catalog');
+    const formatPrice = new Intl.NumberFormat('kk-KZ');
+
+    let cars = [];
+
+    function renderCatalog() {
+      if (!maxPrice.validity.valid) {
+        result.textContent = 'Бағаны 0 немесе одан жоғары санмен енгіз.';
+        catalog.replaceChildren();
+        return;
+      }
+
+      const visibleCars = cars.filter((car) => {
+        const matchesBrand = !brand.value || car.brand === brand.value;
+        const matchesPrice = !maxPrice.value || car.price <= maxPrice.valueAsNumber;
+        return matchesBrand && matchesPrice;
+      });
+
+      result.textContent = visibleCars.length
+        ? `Табылған көлік саны: ${visibleCars.length}`
+        : 'Осы шарттарға сай көлік табылмады.';
+
+      const cards = visibleCars.map((car) => {
+        const card = document.createElement('article');
+        const title = document.createElement('h2');
+        const year = document.createElement('p');
+        const price = document.createElement('strong');
+
+        title.textContent = `${car.brand} ${car.model}`;
+        year.textContent = `${car.year} жыл`;
+        price.textContent = `${formatPrice.format(car.price)} ₸`;
+
+        card.append(title, year, price);
+        return card;
+      });
+
+      catalog.replaceChildren(...cards);
+    }
+
+    async function loadCars() {
+      result.textContent = 'Каталог жүктеліп жатыр…';
+
+      try {
+        const response = await fetch('/api/cars');
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+
+        cars = await response.json();
+
+        const brands = [...new Set(cars.map((car) => car.brand))].sort();
+        for (const name of brands) {
+          brand.add(new Option(name, name));
+        }
+
+        brand.addEventListener('change', renderCatalog);
+        maxPrice.addEventListener('input', renderCatalog);
+        renderCatalog();
+      } catch (error) {
+        result.textContent = 'Каталог жүктелмеді. Бетті жаңартып көр.';
+        console.error(error);
+      }
+    }
+
+    loadCars();
+  </script>
+</body>
+</html>
